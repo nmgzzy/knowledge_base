@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "knowledge-base-cli"
+version = "0.1.0"
+description = "Offline-first local knowledge base CLI"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "knowledge_base" }]
+dependencies = []
+
+[project.scripts]
+kb = "kb.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["kb*"]

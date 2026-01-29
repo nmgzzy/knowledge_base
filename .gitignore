@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+
+kb_index/
+kb_vector/
+test_kb/
