@@ -11,6 +11,7 @@ from .bootstrap import init_kb
 from .indexer import index_kb
 from .importer import add_to_kb
 from .search import search_kb
+from .tree import tree_kb
 
 
 def main(argv: Optional[list[str]] = None) -> None:
@@ -70,6 +71,14 @@ def main(argv: Optional[list[str]] = None) -> None:
         if args.cmd == "repair":
             out = index_kb(kb_root, rebuild=True, embed_chunks=bool(args.embed), only_rel_paths=None)
             _emit(out, json_mode=args.json)
+            return
+
+        if args.cmd == "tree":
+            out = tree_kb(kb_root, depth=args.depth)
+            if args.json:
+                _emit(out, json_mode=True)
+            else:
+                _emit(out["tree"], json_mode=False)
             return
 
         raise SystemExit(2)
@@ -135,5 +144,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_repair = sub.add_parser("repair", help="修复索引/向量一致性（第一版=重建索引）")
     add_kb_root(p_repair)
     p_repair.add_argument("--embed", action="store_true", help="重建时生成 embedding（需要配置）")
+
+    p_tree = sub.add_parser("tree", help="列出知识树文档（支持深度）")
+    add_kb_root(p_tree)
+    p_tree.add_argument("--depth", type=int, default=None, help="最大目录深度（0=仅根目录）")
 
     return p
