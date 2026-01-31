@@ -7,6 +7,40 @@ from kb.bootstrap import init_kb
 
 
 class TestBootstrap(unittest.TestCase):
+    def test_init_kb_creates_gitignore_and_skill_when_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            kb_root = Path(td)
+            out = init_kb(kb_root, force=False)
+
+            inbox_dir = kb_root / "_inbox"
+            self.assertTrue(inbox_dir.exists())
+            self.assertTrue(inbox_dir.is_dir())
+
+            gitignore_path = kb_root / ".gitignore"
+            self.assertTrue(gitignore_path.exists())
+            gitignore_text = gitignore_path.read_text(encoding="utf-8")
+            self.assertIn("_inbox/", gitignore_text)
+            self.assertIn(Path(out["index_dir"]).name + "/", gitignore_text)
+            self.assertIn(Path(out["vector_dir"]).name + "/", gitignore_text)
+
+            skill_path = kb_root / "kb_agent_skill.md"
+            self.assertTrue(skill_path.exists())
+            skill_text = skill_path.read_text(encoding="utf-8")
+            self.assertIn("Knowledge Base Agent Skill", skill_text)
+
+    def test_init_kb_does_not_overwrite_existing_gitignore_and_skill(self):
+        with tempfile.TemporaryDirectory() as td:
+            kb_root = Path(td)
+            kb_root.mkdir(parents=True, exist_ok=True)
+
+            (kb_root / ".gitignore").write_text("SENTINEL_GITIGNORE\n", encoding="utf-8")
+            (kb_root / "kb_agent_skill.md").write_text("SENTINEL_SKILL\n", encoding="utf-8")
+
+            init_kb(kb_root, force=False)
+
+            self.assertEqual((kb_root / ".gitignore").read_text(encoding="utf-8"), "SENTINEL_GITIGNORE\n")
+            self.assertEqual((kb_root / "kb_agent_skill.md").read_text(encoding="utf-8"), "SENTINEL_SKILL\n")
+
     def test_init_kb_force_overwrites_config(self):
         """
         描述：init_kb(force=True) 应覆盖写入默认配置到 kb_config.json。

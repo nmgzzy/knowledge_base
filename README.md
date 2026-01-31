@@ -48,10 +48,13 @@ python -m kb search "你的问题" --kb-root /path/to/my_kb --top 10
 
 ```
 <kb_root>/
+  _inbox/         # 待归档投递箱（先丢原始文件，再用 agent/--auto 归档到 kb/）
   kb/            # 知识树源数据（Markdown + 每目录 meta.json）
   kb_index/      # 索引数据库（SQLite，可重建）
   kb_vector/     # 预留向量缓存目录（第一版主要写入 SQLite 的 embeddings 表）
   kb_config.json # 全局配置
+  .gitignore     # 默认忽略索引/向量目录与 _inbox（若不存在则创建）
+  kb_agent_skill.md # 指导 AI agent 操作/整理知识库（若不存在则创建）
 ```
 
 ## 用法
