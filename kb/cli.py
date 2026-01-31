@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
+from .autoadd_bulk import autoadd_inbox
 from .ask import ask_kb
 from .bootstrap import init_kb
 from .doctor import doctor_kb
@@ -33,6 +34,16 @@ def main(argv: Optional[list[str]] = None) -> None:
                 auto=bool(args.auto),
                 move=bool(args.move),
             )
+            _emit(out, json_mode=args.json)
+            return
+        if args.cmd == "autoadd":
+            inbox_dir = Path(args.inbox).expanduser().resolve() if args.inbox else (kb_root / "_inbox")
+            move = True
+            if getattr(args, "copy", False):
+                move = False
+            if getattr(args, "move", False):
+                move = True
+            out = autoadd_inbox(kb_root, inbox_dir=inbox_dir, move=move)
             _emit(out, json_mode=args.json)
             return
 
@@ -131,6 +142,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_add.add_argument("--dest", default=None, help="目标目录（相对 kb/）")
     p_add.add_argument("--auto", action="store_true", help="启用 LLM 自动归档（若失败自动退化）")
     p_add.add_argument("--move", action="store_true", help="移动源文件（默认复制）")
+
+    p_autoadd = sub.add_parser("autoadd", help="自动归档 _inbox 内的所有文件到知识树")
+    add_kb_root(p_autoadd)
+    p_autoadd.add_argument("--inbox", default=None, help="待归档目录路径（默认 <kb_root>/_inbox）")
+    g_autoadd = p_autoadd.add_mutually_exclusive_group()
+    g_autoadd.add_argument("--move", action="store_true", help="移动源文件（默认）")
+    g_autoadd.add_argument("--copy", action="store_true", help="复制源文件（保留在 inbox）")
 
     p_index = sub.add_parser("index", help="构建或增量更新索引")
     add_kb_root(p_index)

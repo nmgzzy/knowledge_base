@@ -65,6 +65,7 @@ python -m kb search "你的问题" --kb-root /path/to/my_kb --top 10
 | --- | --- | --- |
 | `kb init <kb_root>` | 初始化知识库根目录结构 | `--force` 覆盖配置 |
 | `kb add <path> --kb-root <kb_root>` | 导入文件或目录到知识树 | `--dest` 指定目标目录；`--auto` 自动归档；`--move` 移动源文件 |
+| `kb autoadd --kb-root <kb_root>` | 批量归档投递箱 `_inbox/` | 默认移动源文件清空投递箱；可用 `--copy` 保留 |
 | `kb index --kb-root <kb_root>` | 构建/增量更新索引 | `--rebuild` 重建；`--embed` 写入 embedding；`--only` 仅更新指定 rel_path |
 | `kb search "<query>" --kb-root <kb_root>` | 检索 chunk 段落 | 默认全文；`--semantic` 语义；`--hybrid` 融合 |
 | `kb ask "<query>" --kb-root <kb_root>` | 问答（强制带引用） | `--top-context` 控制检索条数 |
@@ -80,6 +81,14 @@ python -m kb search "你的问题" --kb-root /path/to/my_kb --top 10
 
 ```bash
 kb add /path/to/docs --kb-root /path/to/my_kb
+kb index --kb-root /path/to/my_kb
+```
+
+把文件丢进投递箱并一键自动归档（再更新索引）：
+
+```bash
+cp /path/to/raw/*.md /path/to/my_kb/_inbox/
+kb autoadd --kb-root /path/to/my_kb
 kb index --kb-root /path/to/my_kb
 ```
 
