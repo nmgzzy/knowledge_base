@@ -61,17 +61,19 @@ python -m kb search "你的问题" --kb-root /path/to/my_kb --top 10
 
 ### 命令概览
 
+除 `kb init` 外，其它命令的 `--kb-root` 均可省略：如果当前目录位于某个知识库根目录（包含 `kb_config.json`）或其子目录下，会自动向上查找并推断 `kb_root`；否则会提示你显式指定 `--kb-root`。
+
 | 命令 | 作用 | 备注 |
 | --- | --- | --- |
 | `kb init <kb_root>` | 初始化知识库根目录结构 | `--force` 覆盖配置 |
-| `kb add <path> --kb-root <kb_root>` | 导入文件或目录到知识树 | `--dest` 指定目标目录；`--auto` 自动归档；`--move` 移动源文件 |
-| `kb autoadd --kb-root <kb_root>` | 批量归档投递箱 `_inbox/` | 默认移动源文件清空投递箱；可用 `--copy` 保留 |
-| `kb index --kb-root <kb_root>` | 构建/增量更新索引 | `--rebuild` 重建；`--embed` 写入 embedding；`--only` 仅更新指定 rel_path |
-| `kb search "<query>" --kb-root <kb_root>` | 检索 chunk 段落 | 默认全文；`--semantic` 语义；`--hybrid` 融合 |
-| `kb ask "<query>" --kb-root <kb_root>` | 问答（强制带引用） | `--top-context` 控制检索条数 |
-| `kb tree --kb-root <kb_root>` | 列出知识树文档 | `--depth` 限制深度 |
-| `kb repair --kb-root <kb_root>` | 修复一致性（第一版=重建） | 可配合 `--embed` |
-| `kb doctor --kb-root <kb_root>` | 检测 OpenAI-compatible 接口可用性 | 默认检测 chat+embeddings，可用 `--chat/--embed` |
+| `kb add <path> [--kb-root <kb_root>]` | 导入文件或目录到知识树 | `--dest` 指定目标目录；`--auto` 自动归档；`--move` 移动源文件 |
+| `kb autoadd [--kb-root <kb_root>]` | 批量归档投递箱 `_inbox/` | 默认移动源文件清空投递箱；可用 `--copy` 保留 |
+| `kb index [--kb-root <kb_root>]` | 构建/增量更新索引 | `--rebuild` 重建；`--embed` 写入 embedding；`--only` 仅更新指定 rel_path |
+| `kb search "<query>" [--kb-root <kb_root>]` | 检索 chunk 段落 | 默认全文；`--semantic` 语义；`--hybrid` 融合 |
+| `kb ask "<query>" [--kb-root <kb_root>]` | 问答（强制带引用） | `--top-context` 控制检索条数 |
+| `kb tree [--kb-root <kb_root>]` | 列出知识树文档 | `--depth` 限制深度 |
+| `kb repair [--kb-root <kb_root>]` | 修复一致性（第一版=重建） | 可配合 `--embed` |
+| `kb doctor [--kb-root <kb_root>]` | 检测 OpenAI-compatible 接口可用性 | 默认检测 chat+embeddings，可用 `--chat/--embed` |
 
 所有命令均支持 `--json` 方便脚本集成。
 

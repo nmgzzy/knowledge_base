@@ -9,6 +9,7 @@ venv/
 .vscode/
 .DS_Store
 .build/
+.trae/
 
 kb_index/
 kb_vector/

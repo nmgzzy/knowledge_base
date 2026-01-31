@@ -24,7 +24,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             _emit(out, json_mode=args.json)
             return
 
-        kb_root = Path(args.kb_root).expanduser().resolve()
+        kb_root = _resolve_kb_root(args.kb_root)
 
         if args.cmd == "add":
             out = add_to_kb(
@@ -123,6 +123,26 @@ def _emit(obj: Any, *, json_mode: bool) -> None:
     sys.stdout.write(str(obj) + "\n")
 
 
+def _resolve_kb_root(raw_kb_root: Optional[str]) -> Path:
+    if raw_kb_root:
+        return Path(raw_kb_root).expanduser().resolve()
+    discovered = _discover_kb_root(Path.cwd())
+    if discovered:
+        return discovered
+    raise ValueError(
+        "未指定 --kb-root，且无法从当前目录推断知识库根目录。请在 <kb_root> 或其子目录下运行，或显式传 --kb-root <kb_root>。"
+    )
+
+
+def _discover_kb_root(start_dir: Path) -> Optional[Path]:
+    cur = start_dir.expanduser().resolve()
+    marker = "kb_config.json"
+    for d in [cur, *cur.parents]:
+        if (d / marker).is_file():
+            return d
+    return None
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="kb")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -133,7 +153,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_init.add_argument("--json", action="store_true", help="JSON 输出")
 
     def add_kb_root(sp):
-        sp.add_argument("--kb-root", dest="kb_root", required=True, help="知识库根目录路径")
+        sp.add_argument(
+            "--kb-root",
+            dest="kb_root",
+            default=None,
+            help="知识库根目录路径（可省略：会从当前目录向上寻找 kb_config.json 自动推断）",
+        )
         sp.add_argument("--json", action="store_true", help="JSON 输出")
 
     p_add = sub.add_parser("add", help="导入文档到知识树")
