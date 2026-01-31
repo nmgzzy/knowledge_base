@@ -252,4 +252,4 @@ python tests/run_coverage_trace.py
 
 ## License
 
-MIT License，见 [LICENSE](LICENSE)。
+GPL-3.0 License，见 [LICENSE](LICENSE)。
