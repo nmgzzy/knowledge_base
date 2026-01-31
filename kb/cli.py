@@ -4,7 +4,9 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any, Optional
 
@@ -73,7 +75,16 @@ def main(argv: Optional[list[str]] = None) -> None:
                 hybrid=bool(args.hybrid),
             )
             out = {"query": args.query, "results": [h.to_dict() for h in hits]}
-            _emit(out, json_mode=args.json)
+            if args.json:
+                _emit(out, json_mode=True)
+            else:
+                _emit_search_human(
+                    query=args.query,
+                    hits=out["results"],
+                    top_k=int(args.top),
+                    semantic=bool(args.semantic),
+                    hybrid=bool(args.hybrid),
+                )
             return
 
         if args.cmd == "ask":
@@ -132,6 +143,51 @@ def _emit(obj: Any, *, json_mode: bool) -> None:
             sys.stdout.write(f"{k}: {v}\n")
         return
     sys.stdout.write(str(obj) + "\n")
+
+
+def _emit_search_human(*, query: str, hits: list[dict[str, Any]], top_k: int, semantic: bool, hybrid: bool) -> None:
+    mode = "fts"
+    if semantic:
+        mode = "semantic"
+    if hybrid:
+        mode = "hybrid"
+
+    sys.stdout.write(f"Query: {query}\n")
+    sys.stdout.write(f"Mode: {mode}  Top: {top_k}  Hits: {len(hits)}\n")
+    if not hits:
+        return
+
+    width = shutil.get_terminal_size(fallback=(120, 24)).columns
+    snippet_width = max(40, width - 4)
+
+    for i, h in enumerate(hits, start=1):
+        path = str(h.get("path", ""))
+        heading_path = str(h.get("heading_path", "") or "")
+        start_line, end_line = (h.get("line_range") or [None, None])[:2]
+        score = h.get("score", 0.0)
+        source = str(h.get("source", ""))
+        title = str(h.get("title", "") or "")
+        text = str(h.get("text", "") or "")
+
+        where = path
+        if start_line is not None and end_line is not None:
+            where = f"{path}:L{start_line}-L{end_line}"
+        heading = heading_path or "-"
+        name = title.strip() or "-"
+
+        sys.stdout.write(f"\n[{i}] {where}\n")
+        sys.stdout.write(f"    title: {name}\n")
+        sys.stdout.write(f"    heading: {heading}\n")
+        try:
+            score_num = float(score)
+        except Exception:
+            score_num = 0.0
+        sys.stdout.write(f"    score: {score_num:.4f}  source: {source}\n")
+
+        if text.strip():
+            snippet = " ".join(text.strip().split())
+            wrapped = textwrap.fill(snippet, width=snippet_width, subsequent_indent="    ", initial_indent="    ")
+            sys.stdout.write(f"{wrapped}\n")
 
 
 def _resolve_kb_root(raw_kb_root: Optional[str]) -> Path:
