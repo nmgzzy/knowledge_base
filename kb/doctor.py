@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -7,6 +8,8 @@ from typing import Any
 from .config import load_config
 from .openai_compat import OpenAICompatError, chat_completion, embed, from_config_dict
 from .util import getenv_trim
+
+logger = logging.getLogger(__name__)
 
 
 def doctor_kb(
@@ -24,6 +27,7 @@ def doctor_kb(
         check_chat = True
         check_embed = True
 
+    logger.info("doctor start chat=%s embed=%s base_url=%s", bool(check_chat), bool(check_embed), oa_cfg.base_url)
     checks: dict[str, Any] = {}
     ok = True
 
@@ -31,10 +35,12 @@ def doctor_kb(
         r = _check_embed(oa_cfg, text=text)
         checks["embed"] = r
         ok = ok and bool(r.get("ok"))
+        logger.info("doctor embed ok=%s elapsed_ms=%s", bool(r.get("ok")), r.get("elapsed_ms"))
     if check_chat:
         r = _check_chat(oa_cfg, text=text)
         checks["chat"] = r
         ok = ok and bool(r.get("ok"))
+        logger.info("doctor chat ok=%s elapsed_ms=%s", bool(r.get("ok")), r.get("elapsed_ms"))
 
     info = {
         "base_url": oa_cfg.base_url,

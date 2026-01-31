@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -15,16 +17,21 @@ from .importer import add_to_kb
 from .search import search_kb
 from .tree import tree_kb
 
+logger = logging.getLogger(__name__)
+
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = _build_parser().parse_args(argv)
+    _configure_logging(getattr(args, "log_level", None), json_mode=bool(getattr(args, "json", False)))
     try:
         if args.cmd == "init":
+            logger.info("init kb_root=%s force=%s", args.kb_root, bool(args.force))
             out = init_kb(Path(args.kb_root), force=args.force)
             _emit(out, json_mode=args.json)
             return
 
         kb_root = _resolve_kb_root(args.kb_root)
+        logger.info("%s kb_root=%s", args.cmd, str(kb_root))
 
         if args.cmd == "add":
             out = add_to_kb(
@@ -108,6 +115,7 @@ def main(argv: Optional[list[str]] = None) -> None:
 
         raise SystemExit(2)
     except Exception as e:
+        logger.error("error: %s", str(e))
         if getattr(args, "json", False):
             _emit({"error": str(e)}, json_mode=True)
         else:
@@ -146,6 +154,20 @@ def _discover_kb_root(start_dir: Path) -> Optional[Path]:
     return None
 
 
+def _configure_logging(raw_level: Optional[str], *, json_mode: bool) -> None:
+    level_name = (raw_level or os.getenv("KB_LOG_LEVEL") or ("WARNING" if json_mode else "INFO")).upper()
+    level = getattr(logging, level_name, None)
+    if not isinstance(level, int):
+        level = logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stderr,
+        force=True,
+    )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="kb")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -154,6 +176,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_init.add_argument("kb_root", help="知识库根目录路径")
     p_init.add_argument("--force", action="store_true", help="覆盖已有配置文件")
     p_init.add_argument("--json", action="store_true", help="JSON 输出")
+    p_init.add_argument("--log-level", default=None, help="日志级别：DEBUG/INFO/WARNING/ERROR（也可用环境变量 KB_LOG_LEVEL）")
 
     def add_kb_root(sp):
         sp.add_argument(
@@ -163,6 +186,7 @@ def _build_parser() -> argparse.ArgumentParser:
             help="知识库根目录路径（可省略：会从当前目录向上寻找 kb_config.json 自动推断）",
         )
         sp.add_argument("--json", action="store_true", help="JSON 输出")
+        sp.add_argument("--log-level", default=None, help="日志级别：DEBUG/INFO/WARNING/ERROR（也可用环境变量 KB_LOG_LEVEL）")
 
     p_add = sub.add_parser("add", help="导入文档到知识树")
     p_add.add_argument("path", help="文件或目录路径")

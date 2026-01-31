@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Iterable, Optional
@@ -19,6 +20,8 @@ from .store_sqlite import (
 )
 from .util import ensure_rel_under_base, now_iso, sha256_bytes, sha256_text
 
+logger = logging.getLogger(__name__)
+
 
 def index_kb(
     kb_root: Path,
@@ -32,6 +35,15 @@ def index_kb(
     paths = resolve_paths(kb_root)
     meta_filename = str(cfg.get("meta_filename", "meta.json"))
     db_path = paths.index_dir / "index.sqlite"
+
+    logger.info(
+        "index start kb_root=%s rebuild=%s embed=%s only=%s db=%s",
+        str(kb_root),
+        bool(rebuild),
+        bool(embed_chunks),
+        ",".join(only_rel_paths) if only_rel_paths else "",
+        str(db_path),
+    )
 
     if rebuild and db_path.exists():
         db_path.unlink()
@@ -59,6 +71,8 @@ def index_kb(
             only = {ensure_rel_under_base(p) for p in only_rel_paths}
             cur_files = [p for p in cur_files if _rel_path(paths.kb_dir, p) in only]
 
+        logger.info("scan markdown files=%d", len(cur_files))
+
         cur_rel_set = {_rel_path(paths.kb_dir, p) for p in cur_files}
 
         deleted = [v["doc_id"] for k, v in existing.items() if k not in cur_rel_set]
@@ -78,6 +92,8 @@ def index_kb(
                 continue
             changed.append(abs_path)
 
+        logger.info("diff deleted=%d changed=%d unchanged=%d", len(deleted), len(changed), unchanged)
+
         updated_docs = 0
         updated_chunks = 0
         embedded_chunks_n = 0
@@ -89,9 +105,12 @@ def index_kb(
 
         oa_cfg = from_config_dict(cfg.get("openai_compat", {}) if isinstance(cfg, dict) else {})
         can_embed = embed_chunks and bool(oa_cfg.base_url and oa_cfg.model_embed)
+        if embed_chunks and not can_embed:
+            logger.warning("embed requested but openai_compat.base_url/model_embed not configured")
 
-        for abs_path in changed:
+        for i, abs_path in enumerate(changed, start=1):
             rel_path = _rel_path(paths.kb_dir, abs_path)
+            logger.info("indexing %d/%d: %s", i, len(changed), rel_path)
             st = abs_path.stat()
             raw = abs_path.read_bytes()
             content_hash = sha256_bytes(raw)
@@ -149,13 +168,15 @@ def index_kb(
 
             if can_embed and chunk_dicts:
                 try:
+                    logger.info("embedding chunks=%d: %s", len(chunk_dicts), rel_path)
                     vecs = _embed_in_batches(oa_cfg, [c["text"] for c in chunk_dicts], batch_size=32)
                     conn.execute("BEGIN")
                     upsert_embeddings(conn, model=oa_cfg.model_embed, embeddings=list(zip([c["chunk_id"] for c in chunk_dicts], vecs)))
                     conn.commit()
                     embedded_chunks_n += len(chunk_dicts)
-                except OpenAICompatError:
+                except OpenAICompatError as e:
                     conn.rollback()
+                    logger.warning("embedding failed, skip: %s (%s)", rel_path, str(e))
 
         conn.execute("BEGIN")
         log_action(
@@ -173,6 +194,14 @@ def index_kb(
         )
         conn.commit()
 
+        logger.info(
+            "index done deleted=%d updated_docs=%d updated_chunks=%d embedded_chunks=%d unchanged=%d",
+            len(deleted),
+            updated_docs,
+            updated_chunks,
+            embedded_chunks_n,
+            unchanged,
+        )
         return {
             "deleted_docs": len(deleted),
             "updated_docs": updated_docs,
@@ -276,6 +305,8 @@ def _embed_in_batches(oa_cfg, texts: list[str], *, batch_size: int) -> list[list
     i = 0
     while i < len(texts):
         batch = texts[i : i + batch_size]
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("embed batch %d-%d/%d", i + 1, min(i + len(batch), len(texts)), len(texts))
         out.extend(embed(oa_cfg, texts=batch))
         i += batch_size
     return out

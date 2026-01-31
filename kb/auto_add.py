@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -10,6 +11,8 @@ from .config import load_config, resolve_paths
 from .fs_ops import ensure_dir_meta, merge_meta, read_dir_meta
 from .openai_compat import OpenAICompatError, chat_completion, from_config_dict
 from .util import ensure_rel_under_base, now_iso, write_json_atomic
+
+logger = logging.getLogger(__name__)
 
 
 _re_json_obj = re.compile(r"\{[\s\S]*\}")
@@ -25,6 +28,7 @@ def suggest_destination_with_llm(kb_root: Path, *, src_text: str, src_name: str)
     if len(excerpt) > 8000:
         excerpt = excerpt[:8000]
 
+    logger.info("llm suggest src=%s excerpt_chars=%d dirs=%d", src_name, len(excerpt), len(dirs))
     messages = [
         {
             "role": "system",
@@ -83,6 +87,7 @@ def apply_auto_suggestion(
     existing = read_dir_meta(target_dir, meta_filename=meta_filename)
     merged = merge_meta(existing, dir_meta_patch)
     write_json_atomic(target_dir / meta_filename, merged)
+    logger.info("apply suggestion rel_dir=%s filename=%s", rel_dir, filename)
     return rel_dir, filename, merged
 
 

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 from .config import load_config
 from .openai_compat import chat_completion, from_config_dict
 from .search import RetrievedChunk, search_kb
+
+logger = logging.getLogger(__name__)
 
 
 def ask_kb(
@@ -20,6 +23,8 @@ def ask_kb(
     cfg = load_config(kb_root)
     oa_cfg = from_config_dict(cfg.get("openai_compat", {}) if isinstance(cfg, dict) else {})
 
+    mode = "hybrid" if hybrid else ("semantic" if semantic else "fts")
+    logger.info("ask mode=%s top_context=%d", mode, int(top_context))
     chunks = search_kb(
         kb_root,
         query=query,
@@ -27,6 +32,7 @@ def ask_kb(
         semantic=semantic,
         hybrid=hybrid,
     )
+    logger.info("ask retrieved chunks=%d", len(chunks))
     sources_text = _format_sources(chunks)
     messages = [
         {
@@ -35,7 +41,9 @@ def ask_kb(
         },
         {"role": "user", "content": f"Question:\n{query}\n\nSources:\n{sources_text}"},
     ]
+    logger.info("ask calling chat completion")
     answer = chat_completion(oa_cfg, messages=messages)
+    logger.info("ask done answer_chars=%d", len(answer))
     return {"query": query, "answer": answer, "sources": [c.to_dict() for c in chunks]}
 
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Optional
 
 from .config import resolve_paths
+
+logger = logging.getLogger(__name__)
 
 
 def tree_kb(kb_root: Path, *, depth: Optional[int]) -> dict[str, Any]:
@@ -12,7 +15,9 @@ def tree_kb(kb_root: Path, *, depth: Optional[int]) -> dict[str, Any]:
     if not kb_dir.exists():
         raise FileNotFoundError(f"kb dir not found: {kb_dir}")
 
+    logger.info("tree kb_dir=%s depth=%s", str(kb_dir), str(depth) if depth is not None else "")
     docs = _collect_markdown_docs(kb_dir, depth=depth)
+    logger.info("tree docs=%d", len(docs))
     return {
         "kb_root": str(kb_root),
         "kb_dir": str(kb_dir),
@@ -80,4 +85,3 @@ def _format_tree(root_label: str, rel_files: list[str]) -> str:
     lines = [root_label + "/"]
     lines.extend(render(root, ""))
     return "\n".join(lines)
-

@@ -75,7 +75,9 @@ python -m kb search "你的问题" --kb-root /path/to/my_kb --top 10
 | `kb repair [--kb-root <kb_root>]` | 修复一致性（第一版=重建） | 可配合 `--embed` |
 | `kb doctor [--kb-root <kb_root>]` | 检测 OpenAI-compatible 接口可用性 | 默认检测 chat+embeddings，可用 `--chat/--embed` |
 
-所有命令均支持 `--json` 方便脚本集成。
+所有命令均支持 `--json` 方便脚本集成（日志默认写到 stderr，不影响 stdout 的 JSON）。
+
+所有命令均支持 `--log-level DEBUG/INFO/WARNING/ERROR`（或环境变量 `KB_LOG_LEVEL`）以控制日志详细程度；默认文本模式为 `INFO`，`--json` 模式默认为 `WARNING`。
 
 ### 常见示例
 

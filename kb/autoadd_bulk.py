@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Optional
 
 from .importer import add_to_kb
+
+logger = logging.getLogger(__name__)
 
 
 def autoadd_inbox(
@@ -16,6 +19,7 @@ def autoadd_inbox(
     kb_root = kb_root.expanduser().resolve()
     inbox_dir = (inbox_dir or (kb_root / "_inbox")).expanduser().resolve()
     if not inbox_dir.exists():
+        logger.info("autoadd: inbox not found: %s", str(inbox_dir))
         return {
             "kb_root": str(kb_root),
             "inbox_dir": str(inbox_dir),
@@ -30,7 +34,10 @@ def autoadd_inbox(
     errors: list[dict[str, Any]] = []
     processed = 0
 
-    for abs_path in _walk_inbox_files(inbox_dir):
+    files = list(_walk_inbox_files(inbox_dir))
+    logger.info("autoadd: inbox=%s files=%d move=%s", str(inbox_dir), len(files), bool(move))
+
+    for i, abs_path in enumerate(files, start=1):
         processed += 1
         try:
             rel = abs_path.relative_to(inbox_dir).as_posix()
@@ -39,14 +46,20 @@ def autoadd_inbox(
 
         if _is_probably_binary(abs_path):
             skipped.append({"src": rel, "reason": "binary"})
+            if i == 1 or i == len(files) or (i % 20 == 0):
+                logger.info("autoadd progress %d/%d (skipped binary) src=%s", i, len(files), rel)
             continue
 
         try:
             out = add_to_kb(kb_root, src=abs_path, dest_rel_dir=None, auto=True, move=move)
             imported.append({"src": rel, "result": out})
+            if i == 1 or i == len(files) or (i % 20 == 0):
+                logger.info("autoadd progress %d/%d imported src=%s", i, len(files), rel)
         except Exception as e:
             errors.append({"src": rel, "error": str(e)})
+            logger.warning("autoadd failed src=%s error=%s", rel, str(e))
 
+    logger.info("autoadd done processed=%d imported=%d skipped=%d errors=%d", processed, len(imported), len(skipped), len(errors))
     return {
         "kb_root": str(kb_root),
         "inbox_dir": str(inbox_dir),

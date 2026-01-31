@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -7,9 +8,12 @@ from .config import default_config, load_config, resolve_paths, save_config
 from .fs_ops import ensure_dir_meta
 from .util import write_text_atomic
 
+logger = logging.getLogger(__name__)
+
 
 def init_kb(kb_root: Path, *, force: bool) -> dict[str, Any]:
     kb_root = kb_root.expanduser().resolve()
+    logger.info("prepare directories under kb_root=%s", str(kb_root))
     kb_root.mkdir(parents=True, exist_ok=True)
     (kb_root / "_inbox").mkdir(parents=True, exist_ok=True)
     paths = resolve_paths(kb_root)
@@ -18,6 +22,7 @@ def init_kb(kb_root: Path, *, force: bool) -> dict[str, Any]:
     paths.vector_dir.mkdir(parents=True, exist_ok=True)
 
     if force or not paths.config_path.exists():
+        logger.info("write config=%s (force=%s)", str(paths.config_path), bool(force))
         save_config(kb_root, default_config())
 
     cfg = load_config(kb_root)
@@ -26,6 +31,7 @@ def init_kb(kb_root: Path, *, force: bool) -> dict[str, Any]:
     ensure_dir_meta(paths.kb_dir, meta_filename=meta_filename)
     gitignore_path = kb_root / ".gitignore"
     if not gitignore_path.exists():
+        logger.info("write %s", str(gitignore_path))
         write_text_atomic(
             gitignore_path,
             "\n".join(
@@ -44,6 +50,7 @@ def init_kb(kb_root: Path, *, force: bool) -> dict[str, Any]:
         )
     skill_path = kb_root / "kb_agent_skill.md"
     if not skill_path.exists():
+        logger.info("write %s", str(skill_path))
         write_text_atomic(
             skill_path,
             "\n".join(
