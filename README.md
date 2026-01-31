@@ -67,6 +67,7 @@ python -m kb search "你的问题" --kb-root /path/to/my_kb --top 10
 | `kb ask "<query>" --kb-root <kb_root>` | 问答（强制带引用） | `--top-context` 控制检索条数 |
 | `kb tree --kb-root <kb_root>` | 列出知识树文档 | `--depth` 限制深度 |
 | `kb repair --kb-root <kb_root>` | 修复一致性（第一版=重建） | 可配合 `--embed` |
+| `kb doctor --kb-root <kb_root>` | 检测 OpenAI-compatible 接口可用性 | 默认检测 chat+embeddings，可用 `--chat/--embed` |
 
 所有命令均支持 `--json` 方便脚本集成。
 
@@ -213,7 +214,7 @@ export KB_OPENAI_API_KEY="***"
 运行全部测试：
 
 ```bash
-python -m unittest
+python -m unittest discover -s tests
 ```
 
 覆盖率（标准库 `trace`，输出 `kb.*` 模块统计）：

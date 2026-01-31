@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from .ask import ask_kb
 from .bootstrap import init_kb
+from .doctor import doctor_kb
 from .indexer import index_kb
 from .importer import add_to_kb
 from .search import search_kb
@@ -81,6 +82,16 @@ def main(argv: Optional[list[str]] = None) -> None:
                 _emit(out["tree"], json_mode=False)
             return
 
+        if args.cmd == "doctor":
+            out = doctor_kb(
+                kb_root,
+                check_chat=bool(args.chat),
+                check_embed=bool(args.embed),
+                text=str(args.text),
+            )
+            _emit(out, json_mode=args.json)
+            return
+
         raise SystemExit(2)
     except Exception as e:
         if getattr(args, "json", False):
@@ -148,5 +159,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_tree = sub.add_parser("tree", help="列出知识树文档（支持深度）")
     add_kb_root(p_tree)
     p_tree.add_argument("--depth", type=int, default=None, help="最大目录深度（0=仅根目录）")
+
+    p_doctor = sub.add_parser("doctor", help="检测 OpenAI-compatible 接口可用性（chat/embeddings）")
+    add_kb_root(p_doctor)
+    p_doctor.add_argument("--chat", action="store_true", help="仅检测 chat/completions")
+    p_doctor.add_argument("--embed", action="store_true", help="仅检测 embeddings")
+    p_doctor.add_argument("--text", default="ping", help="测试用输入文本")
 
     return p
