@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kb.doctor import doctor_kb
+from kb.doctor import format_doctor_report
 from kb.util import write_json_atomic
 
 
@@ -70,6 +71,18 @@ class TestDoctor(unittest.TestCase):
                 out = doctor_kb(kb_root, check_chat=True, check_embed=False, text="ping")
             self.assertIn("chat", out["checks"])
             self.assertNotIn("embed", out["checks"])
+
+    def test_format_doctor_report_contains_sections(self):
+        out = {
+            "ok": False,
+            "kb_root": "/x",
+            "openai_compat": {"base_url": "", "api_key_env": "K", "api_key_present": False, "model_chat": "", "model_embed": ""},
+            "checks": {"chat": {"ok": False, "elapsed_ms": 1, "error": "boom"}},
+        }
+        text = format_doctor_report(out)
+        self.assertIn("KB Doctor:", text)
+        self.assertIn("- checks:", text)
+        self.assertIn("- hints:", text)
 
 
 if __name__ == "__main__":

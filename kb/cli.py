@@ -9,7 +9,7 @@ from typing import Any, Optional
 from .autoadd_bulk import autoadd_inbox
 from .ask import ask_kb
 from .bootstrap import init_kb
-from .doctor import doctor_kb
+from .doctor import doctor_kb, format_doctor_report
 from .indexer import index_kb
 from .importer import add_to_kb
 from .search import search_kb
@@ -100,7 +100,10 @@ def main(argv: Optional[list[str]] = None) -> None:
                 check_embed=bool(args.embed),
                 text=str(args.text),
             )
-            _emit(out, json_mode=args.json)
+            if args.json:
+                _emit(out, json_mode=True)
+            else:
+                _emit(format_doctor_report(out), json_mode=False)
             return
 
         raise SystemExit(2)
