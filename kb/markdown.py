@@ -76,6 +76,91 @@ def _parse_simple_yaml(text: str) -> dict[str, Any]:
     return meta
 
 
+def upsert_frontmatter(text: str, *, patch: dict[str, Any]) -> str:
+    lines = text.splitlines()
+    fm, body_start = parse_frontmatter(lines)
+    if body_start == 0 and lines and lines[0].strip() == "---":
+        return text
+
+    desired: dict[str, Any] = {}
+    for k in ("title", "summary", "tags", "keywords"):
+        if k in patch and patch[k] is not None:
+            desired[k] = patch[k]
+
+    updated = dict(fm) if isinstance(fm, dict) else {}
+    changed = False
+    for k, v in desired.items():
+        if k in ("tags", "keywords"):
+            incoming = v if isinstance(v, list) else []
+            existing = updated.get(k)
+            if not isinstance(existing, list):
+                existing = []
+            merged: list[str] = list(existing)
+            for item in incoming:
+                if not isinstance(item, str):
+                    continue
+                s = item.strip()
+                if not s:
+                    continue
+                if s not in merged:
+                    merged.append(s)
+            if merged != existing:
+                updated[k] = merged
+                changed = True
+            continue
+
+        incoming = str(v).strip() if v is not None else ""
+        if not incoming:
+            continue
+        existing = updated.get(k)
+        if existing in (None, ""):
+            updated[k] = incoming
+            changed = True
+
+    if body_start == 0:
+        changed = True
+
+    if not changed:
+        return text
+
+    fm_text = _render_simple_frontmatter(updated)
+    body_lines = lines[body_start:] if body_start > 0 else lines
+    out = fm_text + ("\n".join(body_lines)).lstrip("\n")
+    if text.endswith("\n") and not out.endswith("\n"):
+        out += "\n"
+    return out
+
+
+def _render_simple_frontmatter(meta: dict[str, Any]) -> str:
+    lines: list[str] = ["---"]
+
+    ordered_keys = ["title", "summary", "tags", "keywords"]
+    extra_keys = sorted([k for k in meta.keys() if k not in ordered_keys])
+    for k in ordered_keys + extra_keys:
+        v = meta.get(k)
+        if v in (None, "", [], {}):
+            continue
+        if isinstance(v, bool):
+            lines.append(f"{k}: {'true' if v else 'false'}")
+            continue
+        if isinstance(v, list):
+            items = [str(x).strip() for x in v if str(x).strip()]
+            if not items:
+                continue
+            lines.append(f"{k}:")
+            for it in items:
+                lines.append(f"  - {it}")
+            continue
+        s = str(v).replace("\n", " ").strip()
+        if not s:
+            continue
+        lines.append(f"{k}: {s}")
+
+    lines.append("---")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def extract_links(text: str) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for m in _re_md_link.finditer(text):

@@ -26,6 +26,20 @@ def ensure_dir_meta(dir_path: Path, *, meta_filename: str) -> Path:
     return meta_path
 
 
+def ensure_dir_meta_chain(base_dir: Path, *, rel_dir: str, meta_filename: str) -> list[Path]:
+    base_dir = base_dir.expanduser().resolve()
+    rel_dir = (rel_dir or "").replace("\\", "/").strip()
+    created: list[Path] = []
+    created.append(ensure_dir_meta(base_dir, meta_filename=meta_filename))
+    if not rel_dir or rel_dir == ".":
+        return created
+    cur = base_dir
+    for part in [p for p in rel_dir.split("/") if p and p != "."]:
+        cur = cur / part
+        created.append(ensure_dir_meta(cur, meta_filename=meta_filename))
+    return created
+
+
 def read_dir_meta(dir_path: Path, *, meta_filename: str) -> dict[str, Any]:
     meta_path = ensure_dir_meta(dir_path, meta_filename=meta_filename)
     meta = read_json(meta_path)

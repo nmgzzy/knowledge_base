@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from kb.fs_ops import copy_or_move, ensure_dir_meta, merge_meta, read_dir_meta
+from kb.fs_ops import copy_or_move, ensure_dir_meta, ensure_dir_meta_chain, merge_meta, read_dir_meta
 
 
 class TestDirMeta(unittest.TestCase):
@@ -74,6 +74,16 @@ class TestDirMeta(unittest.TestCase):
         self.assertEqual(merged["keywords"], ["k"])
         self.assertEqual(merged["rules"], {"x": 1, "y": 2})
         self.assertNotEqual(merged["updated_at"], "old")
+
+    def test_ensure_dir_meta_chain_creates_meta_for_each_level(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            kb_dir = root / "kb"
+            ensure_dir_meta_chain(kb_dir, rel_dir="a/b/c", meta_filename="meta.json")
+            self.assertTrue((kb_dir / "meta.json").exists())
+            self.assertTrue((kb_dir / "a" / "meta.json").exists())
+            self.assertTrue((kb_dir / "a" / "b" / "meta.json").exists())
+            self.assertTrue((kb_dir / "a" / "b" / "c" / "meta.json").exists())
 
 
 class TestCopyOrMove(unittest.TestCase):

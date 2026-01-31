@@ -7,8 +7,8 @@ from typing import Any, Optional
 
 from .auto_add import apply_auto_suggestion, default_filename, default_inbox_dir, suggest_destination_with_llm
 from .config import load_config, resolve_paths
-from .fs_ops import copy_or_move, ensure_dir_meta
-from .markdown import guess_title
+from .fs_ops import copy_or_move, ensure_dir_meta_chain
+from .markdown import guess_title, upsert_frontmatter
 from .openai_compat import OpenAICompatError
 from .util import ensure_rel_under_base
 
@@ -44,7 +44,9 @@ def add_to_kb(
             rel_from_src = abs_path.relative_to(src).as_posix()
             target_rel = ensure_rel_under_base(f"{root_rel}/{rel_from_src}")
             dst = paths.kb_dir / target_rel
-            ensure_dir_meta(dst.parent, meta_filename=meta_filename)
+            parent_rel = dst.parent.relative_to(paths.kb_dir).as_posix()
+            parent_rel = "" if parent_rel == "." else parent_rel
+            ensure_dir_meta_chain(paths.kb_dir, rel_dir=parent_rel, meta_filename=meta_filename)
             copy_or_move(abs_path, dst, move=move)
             imported.append(target_rel)
             if i == 1 or i == len(files) or (i % 50 == 0):
@@ -54,7 +56,7 @@ def add_to_kb(
     if dest_rel_dir:
         rel_dir = ensure_rel_under_base(dest_rel_dir)
         dst_dir = paths.kb_dir / rel_dir if rel_dir else paths.kb_dir
-        ensure_dir_meta(dst_dir, meta_filename=meta_filename)
+        ensure_dir_meta_chain(paths.kb_dir, rel_dir=rel_dir, meta_filename=meta_filename)
         src_text = src.read_text(encoding="utf-8", errors="replace")
         title = guess_title(src_text, fallback=src.stem)
         filename = default_filename(src, title=title)
@@ -76,6 +78,19 @@ def add_to_kb(
             dst_dir = paths.kb_dir / rel_dir if rel_dir else paths.kb_dir
             dst = dst_dir / filename
             copy_or_move(src, dst, move=move)
+            doc_summary = str(suggestion.get("doc_summary") or "").strip()
+            tags = suggestion.get("tags") if isinstance(suggestion.get("tags"), list) else []
+            keywords = suggestion.get("keywords") if isinstance(suggestion.get("keywords"), list) else []
+            try:
+                dst_text = dst.read_text(encoding="utf-8", errors="replace")
+                patched = upsert_frontmatter(
+                    dst_text,
+                    patch={"title": title, "summary": doc_summary, "tags": tags, "keywords": keywords},
+                )
+                if patched != dst_text:
+                    dst.write_text(patched, encoding="utf-8")
+            except Exception as e:
+                logger.warning("frontmatter update skipped: %s", str(e))
             imported.append(dst.relative_to(paths.kb_dir).as_posix())
             logger.info("imported (auto) -> %s", imported[-1])
             return {"imported": imported, "mode": "auto", "dest_rel_dir": rel_dir, "suggestion": suggestion}
@@ -85,7 +100,7 @@ def add_to_kb(
     rel_dir = default_inbox_dir()
     rel_dir = ensure_rel_under_base(rel_dir)
     dst_dir = paths.kb_dir / rel_dir
-    ensure_dir_meta(dst_dir, meta_filename=meta_filename)
+    ensure_dir_meta_chain(paths.kb_dir, rel_dir=rel_dir, meta_filename=meta_filename)
     src_text = src.read_text(encoding="utf-8", errors="replace")
     title = guess_title(src_text, fallback=src.stem)
     filename = default_filename(src, title=title)

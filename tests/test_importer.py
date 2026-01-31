@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kb.bootstrap import init_kb
+from kb.markdown import parse_frontmatter
 from kb.importer import add_to_kb
 from kb.openai_compat import OpenAICompatError
 
@@ -86,6 +87,8 @@ class TestImporter(unittest.TestCase):
             self.assertEqual(out["imported"], ["notes/x.md"])
             dst = kb_root.expanduser().resolve() / "kb" / "notes" / "x.md"
             self.assertTrue(dst.exists())
+            meta, _ = parse_frontmatter(dst.read_text(encoding="utf-8").splitlines())
+            self.assertEqual(meta.get("title"), "X")
 
     def test_add_to_kb_auto_falls_back_to_inbox_on_llm_error(self):
         """

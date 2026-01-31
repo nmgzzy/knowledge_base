@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .config import load_config, resolve_paths
-from .fs_ops import ensure_dir_meta, merge_meta, read_dir_meta
+from .fs_ops import ensure_dir_meta_chain, merge_meta, read_dir_meta
 from .openai_compat import OpenAICompatError, chat_completion, from_config_dict
 from .util import ensure_rel_under_base, now_iso, write_json_atomic
 
@@ -49,11 +49,14 @@ def suggest_destination_with_llm(kb_root: Path, *, src_text: str, src_name: str)
                         "suggested_rel_dir": "string",
                         "suggested_filename": "string",
                         "dir_meta": "object",
+                        "dir_meta_chain": [{"rel_dir": "string", "dir_meta": "object"}],
                     },
                     "constraints": [
                         "suggested_rel_dir 必须是 kb/ 下的相对路径，不能包含 .. 或绝对路径",
                         "suggested_filename 可选，若为空使用原文件名",
-                        "dir_meta 仅在需要新建目录或补全目录元数据时给出",
+                        "dir_meta 仅在需要新建目录或补全目录元数据时给出（默认作用于 suggested_rel_dir）",
+                        "dir_meta_chain 可选：用于为目录链路中多个目录分别补全/新建元数据（例如 A、A/B、A/B/C）",
+                        "如果 suggested_rel_dir 不在 existing_dirs 中（即新目录），请至少提供该目录的 dir_meta 或在 dir_meta_chain 中覆盖该目录",
                     ],
                 },
                 ensure_ascii=False,
@@ -83,10 +86,52 @@ def apply_auto_suggestion(
 
     paths = resolve_paths(kb_root)
     target_dir = paths.kb_dir / rel_dir if rel_dir else paths.kb_dir
-    ensure_dir_meta(target_dir, meta_filename=meta_filename)
-    existing = read_dir_meta(target_dir, meta_filename=meta_filename)
-    merged = merge_meta(existing, dir_meta_patch)
-    write_json_atomic(target_dir / meta_filename, merged)
+    ensure_dir_meta_chain(paths.kb_dir, rel_dir=rel_dir, meta_filename=meta_filename)
+    patches_by_rel_dir: dict[str, dict[str, Any]] = {}
+
+    def _merge_patch(existing_patch: dict[str, Any], incoming_patch: dict[str, Any]) -> dict[str, Any]:
+        out = dict(existing_patch)
+        for k, v in incoming_patch.items():
+            if v is None:
+                continue
+            if isinstance(v, list) and isinstance(out.get(k), list):
+                merged = list(out[k])
+                for item in v:
+                    if item not in merged:
+                        merged.append(item)
+                out[k] = merged
+                continue
+            if isinstance(v, dict) and isinstance(out.get(k), dict):
+                merged = dict(out[k])
+                merged.update(v)
+                out[k] = merged
+                continue
+            out[k] = v
+        return out
+    chain = suggestion.get("dir_meta_chain")
+    if isinstance(chain, list):
+        for item in chain:
+            if not isinstance(item, dict):
+                continue
+            item_rel_dir = ensure_rel_under_base(str(item.get("rel_dir", "")).strip())
+            item_patch = item.get("dir_meta")
+            if not isinstance(item_patch, dict) or not item_patch:
+                continue
+            patches_by_rel_dir.setdefault(item_rel_dir, {})
+            patches_by_rel_dir[item_rel_dir] = _merge_patch(patches_by_rel_dir[item_rel_dir], item_patch)
+
+    if dir_meta_patch:
+        patches_by_rel_dir.setdefault(rel_dir, {})
+        patches_by_rel_dir[rel_dir] = _merge_patch(patches_by_rel_dir[rel_dir], dir_meta_patch)
+
+    for p_rel_dir in sorted(patches_by_rel_dir.keys(), key=lambda x: (0 if x == "" else x.count("/") + 1, x)):
+        p_target_dir = paths.kb_dir / p_rel_dir if p_rel_dir else paths.kb_dir
+        ensure_dir_meta_chain(paths.kb_dir, rel_dir=p_rel_dir, meta_filename=meta_filename)
+        existing = read_dir_meta(p_target_dir, meta_filename=meta_filename)
+        merged = merge_meta(existing, patches_by_rel_dir[p_rel_dir])
+        write_json_atomic(p_target_dir / meta_filename, merged)
+
+    merged = read_dir_meta(target_dir, meta_filename=meta_filename)
     logger.info("apply suggestion rel_dir=%s filename=%s", rel_dir, filename)
     return rel_dir, filename, merged
 

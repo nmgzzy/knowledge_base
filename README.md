@@ -16,7 +16,7 @@
   - 全文：SQLite FTS5（BM25）
   - 语义（可选）：OpenAI-compatible embeddings（第一版为全表扫描）
   - 融合（可选）：FTS + 向量分数简单融合
-- 自动归档（可选）：`kb add --auto` 调用 LLM 生成摘要/关键词并推荐目录，失败自动降级到 inbox
+- 自动归档（可选）：`kb add --auto` / `kb autoadd` 调用 LLM 生成分类目录、文件名与元数据；支持新建目录并为目录链路各级生成/更新 `meta.json`；同时把文档 `title/summary/tags/keywords` 写入 Markdown frontmatter 供 `kb index` 读取；失败自动降级到 inbox
 
 ## 快速开始
 
@@ -217,6 +217,7 @@ export KB_OPENAI_API_KEY="***"
 ## 工作原理（简述）
 
 - 源数据：知识以 `kb/` 下的 Markdown 文件保存，每个目录维护一个 `meta.json`
+- 自动归档：模型返回目标目录/文件名与文档/目录元数据；落盘时补齐多级目录的 `meta.json`，并把文档元数据写入 frontmatter，使索引可直接读取
 - Chunk 切分：按标题栈（`H1 > H2 > ...`）与段落切分，并记录 `start_line/end_line`
 - 索引：写入 `kb_index/index.sqlite`，包含 docs/chunks/FTS 表，以及可选的 embeddings 表
 - 检索：

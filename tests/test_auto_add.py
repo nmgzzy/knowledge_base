@@ -73,6 +73,47 @@ class TestApplyAutoSuggestion(unittest.TestCase):
             self.assertEqual(meta.get("summary"), "S")
             self.assertIn("t1", meta.get("tags", []))
 
+    def test_apply_auto_suggestion_creates_meta_for_parent_dirs(self):
+        with tempfile.TemporaryDirectory() as td:
+            kb_root = Path(td)
+            init_kb(kb_root, force=False)
+
+            suggestion = {
+                "suggested_rel_dir": "a/b/c",
+                "suggested_filename": "demo.md",
+                "dir_meta": {"summary": "S"},
+            }
+            apply_auto_suggestion(kb_root, suggestion=suggestion, meta_filename="meta.json")
+
+            base = kb_root.expanduser().resolve() / "kb"
+            self.assertTrue((base / "a" / "meta.json").exists())
+            self.assertTrue((base / "a" / "b" / "meta.json").exists())
+            self.assertTrue((base / "a" / "b" / "c" / "meta.json").exists())
+
+    def test_apply_auto_suggestion_applies_dir_meta_chain(self):
+        with tempfile.TemporaryDirectory() as td:
+            kb_root = Path(td)
+            init_kb(kb_root, force=False)
+
+            suggestion = {
+                "suggested_rel_dir": "a/b/c",
+                "suggested_filename": "demo.md",
+                "dir_meta_chain": [
+                    {"rel_dir": "a", "dir_meta": {"summary": "A"}},
+                    {"rel_dir": "a/b", "dir_meta": {"tags": ["t"]}},
+                ],
+                "dir_meta": {"summary": "C"},
+            }
+            apply_auto_suggestion(kb_root, suggestion=suggestion, meta_filename="meta.json")
+
+            base = kb_root.expanduser().resolve() / "kb"
+            a_meta = json.loads((base / "a" / "meta.json").read_text(encoding="utf-8"))
+            ab_meta = json.loads((base / "a" / "b" / "meta.json").read_text(encoding="utf-8"))
+            c_meta = json.loads((base / "a" / "b" / "c" / "meta.json").read_text(encoding="utf-8"))
+            self.assertEqual(a_meta.get("summary"), "A")
+            self.assertIn("t", ab_meta.get("tags", []))
+            self.assertEqual(c_meta.get("summary"), "C")
+
 
 class TestSuggestDestinationWithLLM(unittest.TestCase):
     def test_suggest_destination_with_llm_raises_on_invalid_json(self):

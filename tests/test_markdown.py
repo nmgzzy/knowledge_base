@@ -1,6 +1,6 @@
 import unittest
 
-from kb.markdown import Chunk, chunk_markdown, extract_links, guess_title, parse_frontmatter
+from kb.markdown import Chunk, chunk_markdown, extract_links, guess_title, parse_frontmatter, upsert_frontmatter
 
 
 class TestMarkdownFrontmatter(unittest.TestCase):
@@ -57,6 +57,38 @@ class TestMarkdownFrontmatter(unittest.TestCase):
         self.assertEqual(meta.get("tags"), ["a", "b", "c"])
         self.assertEqual(meta.get("keywords"), ["k1", "k2"])
         self.assertEqual(body_start, 8)
+
+    def test_upsert_frontmatter_creates_when_missing(self):
+        text = "# Body\n\nx\n"
+        out = upsert_frontmatter(text, patch={"title": "T", "summary": "S", "tags": ["a"], "keywords": ["k"]})
+        meta, body_start = parse_frontmatter(out.splitlines())
+        self.assertEqual(meta.get("title"), "T")
+        self.assertEqual(meta.get("summary"), "S")
+        self.assertEqual(meta.get("tags"), ["a"])
+        self.assertEqual(meta.get("keywords"), ["k"])
+        self.assertGreater(body_start, 0)
+
+    def test_upsert_frontmatter_merges_without_overwriting_non_empty_scalar(self):
+        text = "\n".join(
+            [
+                "---",
+                "title: Keep",
+                "tags: [a]",
+                "---",
+                "# Body",
+                "",
+            ]
+        )
+        out = upsert_frontmatter(text, patch={"title": "New", "tags": ["a", "b"], "summary": "S"})
+        meta, _ = parse_frontmatter(out.splitlines())
+        self.assertEqual(meta.get("title"), "Keep")
+        self.assertEqual(meta.get("summary"), "S")
+        self.assertEqual(meta.get("tags"), ["a", "b"])
+
+    def test_upsert_frontmatter_skips_when_frontmatter_unclosed(self):
+        text = "\n".join(["---", "title: x", "tags: [a,b]", "# Body", ""])
+        out = upsert_frontmatter(text, patch={"title": "T"})
+        self.assertEqual(out, text)
 
 
 class TestMarkdownChunking(unittest.TestCase):
